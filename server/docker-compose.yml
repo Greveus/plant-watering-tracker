@@ -1,0 +1,16 @@
+services:
+  plant-sync:
+    build: .
+    container_name: plant-sync-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - SYNC_TOKEN=${SYNC_TOKEN}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

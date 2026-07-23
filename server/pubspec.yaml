@@ -1,0 +1,21 @@
+name: plant_watering_sync_server
+description: Lokaler Sync-Server für den Plant Watering Tracker (Homeserver-Backend).
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  sqlite3: ^3.4.0
+  uuid: ^4.6.0
+  json_annotation: ^4.12.0
+
+dev_dependencies:
+  test: ^1.26.3
+  build_runner: ^2.15.2
+  json_serializable: ^6.14.0
+  lints: ^6.0.0
+  http: ^1.6.0
