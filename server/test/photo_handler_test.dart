@@ -140,4 +140,96 @@ void main() {
     );
     expect(response.statusCode, 404);
   });
+
+  test('Upload aktualisiert received_at, damit sich ein reiner Foto-Wechsel '
+      'im Metadaten-Sync propagiert', () async {
+    final before =
+        db.raw.select('SELECT received_at FROM plants WHERE id = ?', ['p1']).first['received_at']
+            as int;
+
+    // Kleine, aber sichere Wartezeit, damit der neue Zeitstempel garantiert
+    // größer ist als der Insert-Zeitstempel aus setUp.
+    await Future.delayed(const Duration(milliseconds: 5));
+
+    final bytes = Uint8List.fromList([1, 2, 3]);
+    final uploadRequest = http.MultipartRequest('PUT', Uri.parse('$baseUrl/plants/p1/photo'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..headers['x-photo-version'] = 'hash-v1'
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'photo.jpg'));
+    final response = await http.Response.fromStream(await uploadRequest.send());
+    expect(response.statusCode, 200);
+
+    final after =
+        db.raw.select('SELECT received_at FROM plants WHERE id = ?', ['p1']).first['received_at']
+            as int;
+    expect(after, greaterThan(before));
+  });
+
+  test('Upload mit veraltetem erwarteten Vorgänger-Stand liefert 409 und '
+      'überschreibt das bereits hochgeladene Foto nicht', () async {
+    final firstBytes = Uint8List.fromList([1, 2, 3]);
+    final firstUpload = http.MultipartRequest('PUT', Uri.parse('$baseUrl/plants/p1/photo'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..headers['x-photo-version'] = 'hash-v1'
+      ..files.add(http.MultipartFile.fromBytes('file', firstBytes, filename: 'photo.jpg'));
+    final firstResponse = await http.Response.fromStream(await firstUpload.send());
+    expect(firstResponse.statusCode, 200);
+
+    // Zweites Gerät kennt noch den Stand VOR firstUpload (leer) und versucht,
+    // ein eigenes Foto hochzuladen – der Server muss das ablehnen, da sich
+    // der Stand zwischenzeitlich geändert hat.
+    final secondBytes = Uint8List.fromList([4, 5, 6]);
+    final conflictingUpload = http.MultipartRequest('PUT', Uri.parse('$baseUrl/plants/p1/photo'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..headers['x-photo-version'] = 'hash-v2'
+      ..headers['x-expected-photo-version'] = 'hash-v0-nie-existiert'
+      ..files.add(http.MultipartFile.fromBytes('file', secondBytes, filename: 'photo.jpg'));
+    final conflictingResponse = await http.Response.fromStream(await conflictingUpload.send());
+    expect(conflictingResponse.statusCode, 409);
+
+    final downloadResponse = await http.get(
+      Uri.parse('$baseUrl/plants/p1/photo'),
+      headers: {'authorization': 'Bearer $token'},
+    );
+    expect(downloadResponse.bodyBytes, equals(firstBytes));
+  });
+
+  test('Upload mit passendem erwarteten Vorgänger-Stand wird angenommen', () async {
+    final firstBytes = Uint8List.fromList([1, 2, 3]);
+    final firstUpload = http.MultipartRequest('PUT', Uri.parse('$baseUrl/plants/p1/photo'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..headers['x-photo-version'] = 'hash-v1'
+      ..files.add(http.MultipartFile.fromBytes('file', firstBytes, filename: 'photo.jpg'));
+    await http.Response.fromStream(await firstUpload.send());
+
+    final secondBytes = Uint8List.fromList([4, 5, 6]);
+    final secondUpload = http.MultipartRequest('PUT', Uri.parse('$baseUrl/plants/p1/photo'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..headers['x-photo-version'] = 'hash-v2'
+      ..headers['x-expected-photo-version'] = 'hash-v1'
+      ..files.add(http.MultipartFile.fromBytes('file', secondBytes, filename: 'photo.jpg'));
+    final secondResponse = await http.Response.fromStream(await secondUpload.send());
+    expect(secondResponse.statusCode, 200);
+
+    final downloadResponse = await http.get(
+      Uri.parse('$baseUrl/plants/p1/photo'),
+      headers: {'authorization': 'Bearer $token'},
+    );
+    expect(downloadResponse.bodyBytes, equals(secondBytes));
+  });
+
+  test('Upload eines zu großen Fotos liefert 413, ohne den kompletten Body '
+      'zu puffern', () async {
+    // Größer als _maxPhotoBytes (10 MB) – falls das Streaming-Limit nicht
+    // greifen würde, würde dieser Test durch Speicherverbrauch/Timeout statt
+    // durch eine saubere 413-Assertion auffallen.
+    final oversized = Uint8List(10 * 1024 * 1024 + 1);
+    final uploadRequest = http.MultipartRequest('PUT', Uri.parse('$baseUrl/plants/p1/photo'))
+      ..headers['authorization'] = 'Bearer $token'
+      ..headers['x-photo-version'] = 'hash-oversized'
+      ..files.add(http.MultipartFile.fromBytes('file', oversized, filename: 'photo.jpg'));
+
+    final response = await http.Response.fromStream(await uploadRequest.send());
+    expect(response.statusCode, 413);
+  });
 }
