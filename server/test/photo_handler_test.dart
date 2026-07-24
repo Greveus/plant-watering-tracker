@@ -576,4 +576,15 @@ void main() {
     // konsumiert wurde, statt beim ersten Überschreiten abzubrechen.
     expect(chunksEmitted, lessThan((maxBytes / chunkSize).ceil() + 5));
   });
+
+  // Kein Test für einen nicht-numerischen Content-Length-Header (Review-Runde
+  // 3, W-1): geprüft per rohem TCP-Socket, aber dart:io's HttpServer lehnt
+  // einen malformed Content-Length-Header bereits auf Protokoll-Ebene ab
+  // (Verbindungsabbruch ohne jede Antwort), BEVOR der Request überhaupt am
+  // shelf-Handler ankommt – der Fix in photo_handler.dart (try/catch um
+  // request.contentLength) ist dadurch defensiv weiterhin sinnvoll (z. B.
+  // falls der Server künftig hinter einem Reverse-Proxy läuft, der Header
+  // manipulieren könnte), aber der Fehlerfall lässt sich mit den hier
+  // verfügbaren Mitteln (dart:io HttpServer als Testserver) nicht auslösen,
+  // ohne den Handler direkt mit einem gefälschten shelf.Request zu testen.
 }

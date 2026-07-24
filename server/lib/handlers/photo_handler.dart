@@ -45,8 +45,21 @@ class PhotoHandler {
       return Response.notFound(jsonEncode({'error': 'plant_not_found'}));
     }
 
-    final contentLength = request.contentLength;
-    if (contentLength != null && contentLength > _maxPhotoBytes) {
+    int? contentLength;
+    try {
+      contentLength = request.contentLength;
+    } on FormatException {
+      // request.contentLength parst den Content-Length-Header intern via
+      // int.parse und wirft bei einem nicht-numerischen Wert – ohne diesen
+      // Fang würde ein fehlerhafter Client hier einen unkontrollierten 500
+      // statt einer sauberen 400-Antwort auslösen.
+      return Response(400, body: jsonEncode({'error': 'invalid_content_length'}));
+    }
+    // Ein negativer Wert bestünde die reine ">"-Prüfung fälschlich immer;
+    // die eigentliche Verteidigungslinie gegen zu große Uploads bleibt
+    // ohnehin _readBoundedBytes (siehe dort), dieser Check ist nur ein
+    // Fast-Path für den Normalfall.
+    if (contentLength != null && (contentLength < 0 || contentLength > _maxPhotoBytes)) {
       return Response(413, body: jsonEncode({'error': 'photo_too_large'}));
     }
 
