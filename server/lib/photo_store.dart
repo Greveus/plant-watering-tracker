@@ -16,6 +16,14 @@ class ServerPhotoStore {
     }
   }
 
+  /// Fester `.jpg`-Suffix unabhängig vom tatsächlich hochgeladenen Content-
+  /// Type: bewusste Design-Entscheidung, kein übersehener Bug. Der einzige
+  /// Client (Flutter-App) schickt laut Protokoll immer JPEG-komprimierte
+  /// Bytes (`image_picker` mit `imageQuality: 80`, siehe
+  /// `PlantPhotoStore.pickAndStore`) – der Server verlässt sich auf diesen
+  /// Vertrag, statt den Content-Type serverseitig zu validieren, da er
+  /// laut Architektur-Grundsatz "nur Rohdaten speichern, nicht prüfen/
+  /// verarbeiten" bewusst keine Bildverarbeitung betreibt.
   File _fileFor(String plantId) => File('${directory.path}/$plantId.jpg');
 
   Future<void> write(String plantId, Uint8List bytes) async {
