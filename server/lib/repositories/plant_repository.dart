@@ -21,8 +21,9 @@ class PlantRepository {
         '''
         INSERT INTO plants (
           id, nickname, preset_id, species_free_text, room_id, photo_path,
-          created_at, size_category, manual_interval_days, updated_at, deleted_at, received_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          photo_version, created_at, size_category, manual_interval_days,
+          updated_at, deleted_at, received_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
         [
           plant.id,
@@ -31,6 +32,7 @@ class PlantRepository {
           plant.speciesFreeText,
           plant.roomId,
           plant.photoPath,
+          plant.photoVersion,
           plant.createdAt.toUtc().millisecondsSinceEpoch,
           plant.sizeCategory,
           plant.manualIntervalDays,
@@ -48,7 +50,7 @@ class PlantRepository {
         '''
         UPDATE plants SET
           nickname = ?, preset_id = ?, species_free_text = ?, room_id = ?,
-          photo_path = ?, size_category = ?, manual_interval_days = ?,
+          photo_path = ?, photo_version = ?, size_category = ?, manual_interval_days = ?,
           updated_at = ?, deleted_at = ?, received_at = ?
         WHERE id = ?
         ''',
@@ -58,6 +60,7 @@ class PlantRepository {
           plant.speciesFreeText,
           plant.roomId,
           plant.photoPath,
+          plant.photoVersion,
           plant.sizeCategory,
           plant.manualIntervalDays,
           incomingMillis,
@@ -88,6 +91,7 @@ class PlantRepository {
       speciesFreeText: row['species_free_text'] as String?,
       roomId: row['room_id'] as String,
       photoPath: row['photo_path'] as String?,
+      photoVersion: row['photo_version'] as String?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int, isUtc: true),
       sizeCategory: row['size_category'] as String,
       manualIntervalDays: row['manual_interval_days'] as int?,

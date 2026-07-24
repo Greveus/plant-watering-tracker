@@ -7,7 +7,9 @@ import 'package:shelf_router/shelf_router.dart';
 import 'auth_middleware.dart';
 import 'db/server_database.dart';
 import 'handlers/health_handler.dart';
+import 'handlers/photo_handler.dart';
 import 'handlers/sync_handler.dart';
+import 'photo_store.dart';
 
 Future<HttpServer> run() async {
   final dbPath = Platform.environment['SYNC_DB_PATH'] ?? 'sync.db';
@@ -19,10 +21,14 @@ Future<HttpServer> run() async {
 
   final db = ServerDatabase.open(dbPath);
   final syncHandler = SyncHandler(db);
+  final photosDir = Platform.environment['SYNC_PHOTOS_PATH'] ?? 'photos';
+  final photoHandler = PhotoHandler(db, ServerPhotoStore(Directory(photosDir)));
 
   final router = Router()
     ..get('/health', handleHealth)
-    ..post('/sync', syncHandler.call);
+    ..post('/sync', syncHandler.call)
+    ..put('/plants/<id>/photo', photoHandler.upload)
+    ..get('/plants/<id>/photo', photoHandler.download);
 
   final pipeline = const Pipeline()
       .addMiddleware(logRequests())

@@ -10,6 +10,7 @@ class PlantDto {
   final String? speciesFreeText;
   final String roomId;
   final String? photoPath;
+  final String? photoVersion;
   final DateTime createdAt;
   final String sizeCategory;
   final int? manualIntervalDays;
@@ -23,6 +24,7 @@ class PlantDto {
     this.speciesFreeText,
     required this.roomId,
     this.photoPath,
+    this.photoVersion,
     required this.createdAt,
     required this.sizeCategory,
     this.manualIntervalDays,

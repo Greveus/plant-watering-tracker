@@ -18,4 +18,5 @@ COPY --from=build /app/out/bundle /app
 EXPOSE 8080
 VOLUME /data
 ENV SYNC_DB_PATH=/data/sync.db
+ENV SYNC_PHOTOS_PATH=/data/photos
 ENTRYPOINT ["/app/bin/server"]

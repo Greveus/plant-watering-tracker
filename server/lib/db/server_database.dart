@@ -10,6 +10,7 @@ class ServerDatabase {
     db.execute('PRAGMA journal_mode = WAL;');
     db.execute('PRAGMA foreign_keys = OFF;');
     _createSchema(db);
+    _migrateSchema(db);
     return ServerDatabase._(db);
   }
 
@@ -65,6 +66,23 @@ class ServerDatabase {
     db.execute(
       'CREATE INDEX IF NOT EXISTS idx_events_received_at ON watering_events(received_at);',
     );
+  }
+
+  /// `CREATE TABLE IF NOT EXISTS` ändert nichts an bereits existierenden
+  /// Tabellen – neue Spalten für Bestandsinstallationen müssen daher separat
+  /// per `ALTER TABLE` nachgezogen werden, jeweils nur falls noch nicht
+  /// vorhanden (geprüft über `PRAGMA table_info`, da SQLite kein
+  /// `ADD COLUMN IF NOT EXISTS` kennt).
+  static void _migrateSchema(Database db) {
+    final columns = db.select('PRAGMA table_info(plants);').map((r) => r['name'] as String);
+    if (!columns.contains('photo_version')) {
+      // photo_version (Content-Hash des aktuell hinterlegten Fotos) erlaubt
+      // Clients zu erkennen, ob sich ein Foto seit dem letzten Sync geändert
+      // hat, ohne die Bilddatei bei jedem /sync-Aufruf zu übertragen – der
+      // eigentliche Datei-Transfer läuft über separate /plants/{id}/photo-
+      // Routen, siehe PhotoHandler.
+      db.execute('ALTER TABLE plants ADD COLUMN photo_version TEXT;');
+    }
   }
 
   Database get raw => _db;
