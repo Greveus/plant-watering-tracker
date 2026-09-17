@@ -9,6 +9,18 @@ services:
       - ./data:/data
     environment:
       - SYNC_TOKEN=${SYNC_TOKEN}
+    # Der Server braucht keine Linux-Capabilities: er bindet einen Port > 1024
+    # und schreibt ausschließlich nach /data. Das Entrypoint-Skript legt die
+    # Rootrechte nach dem chown selbst ab (siehe docker-entrypoint.sh), CHOWN
+    # ist dafür die einzige benötigte Capability.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 30s

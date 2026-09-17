@@ -371,8 +371,12 @@ void main() {
   });
 
   test('Upload ohne x-expected-photo-version-Header überschreibt ein '
-      'bestehendes Foto trotzdem (dokumentiertes Force-Overwrite-Verhalten '
-      'bei fehlendem Header, siehe Kommentar in photo_handler.dart)', () async {
+      'bestehendes Foto NICHT mehr, sondern liefert 409', () async {
+    // Regressionstest: Zuvor genügte ein fehlender Header, um jeden
+    // Serverstand bedingungslos zu ersetzen. Ein Client, dem der zuletzt
+    // bekannte Server-Stand fehlt (z. B. weil die Pflanze aus seinem
+    // Delta-Fenster gefallen ist), konnte damit ein neueres fremdes Foto
+    // durch sein eigenes älteres überschreiben.
     final firstBytes = Uint8List.fromList([1, 2, 3]);
     final firstUpload =
         http.MultipartRequest(
@@ -390,11 +394,10 @@ void main() {
               filename: 'photo.jpg',
             ),
           );
-    await http.Response.fromStream(await firstUpload.send());
+    final firstResponse = await http.Response.fromStream(await firstUpload.send());
+    expect(firstResponse.statusCode, 200,
+        reason: 'Der Erst-Upload ohne Header bleibt erlaubt (photo_version IS NULL)');
 
-    // Zweiter Upload OHNE x-expected-photo-version – wird laut Design nicht
-    // gegen den Serverstand geprüft und muss daher durchgehen, auch wenn
-    // bereits ein anderes Foto existiert.
     final secondBytes = Uint8List.fromList([9, 9, 9]);
     final secondUpload =
         http.MultipartRequest(
@@ -415,6 +418,48 @@ void main() {
     final secondResponse = await http.Response.fromStream(
       await secondUpload.send(),
     );
+    expect(secondResponse.statusCode, 409);
+
+    // Das ursprüngliche Foto muss unangetastet geblieben sein.
+    final downloadResponse = await http.get(
+      Uri.parse('$baseUrl/plants/aaaaaaaa-1111-4111-8111-111111111111/photo'),
+      headers: {'authorization': 'Bearer $token'},
+    );
+    expect(downloadResponse.bodyBytes, equals(firstBytes));
+  });
+
+  test('Upload mit korrekt mitgeschicktem Vorgänger-Stand überschreibt weiterhin',
+      () async {
+    final firstBytes = Uint8List.fromList([1, 2, 3]);
+    final firstUpload =
+        http.MultipartRequest(
+            'PUT',
+            Uri.parse(
+              '$baseUrl/plants/aaaaaaaa-1111-4111-8111-111111111111/photo',
+            ),
+          )
+          ..headers['authorization'] = 'Bearer $token'
+          ..headers['x-photo-version'] = 'hash-v1'
+          ..files.add(
+            http.MultipartFile.fromBytes('file', firstBytes, filename: 'photo.jpg'),
+          );
+    await http.Response.fromStream(await firstUpload.send());
+
+    final secondBytes = Uint8List.fromList([9, 9, 9]);
+    final secondUpload =
+        http.MultipartRequest(
+            'PUT',
+            Uri.parse(
+              '$baseUrl/plants/aaaaaaaa-1111-4111-8111-111111111111/photo',
+            ),
+          )
+          ..headers['authorization'] = 'Bearer $token'
+          ..headers['x-photo-version'] = 'hash-v2'
+          ..headers['x-expected-photo-version'] = 'hash-v1'
+          ..files.add(
+            http.MultipartFile.fromBytes('file', secondBytes, filename: 'photo.jpg'),
+          );
+    final secondResponse = await http.Response.fromStream(await secondUpload.send());
     expect(secondResponse.statusCode, 200);
 
     final downloadResponse = await http.get(

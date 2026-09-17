@@ -70,6 +70,17 @@ Health-Check-Status prüfen:
 docker inspect --format='{{json .State.Health}}' plant-sync-server
 ```
 
+### Häufige Fälle
+
+- **Der Container startet endlos neu** (`docker compose ps` zeigt dauerhaft „Restarting"): Meist fehlt die `.env`-Datei oder `SYNC_TOKEN` ist darin leer. Der Server bricht dann absichtlich sofort ab, damit er nicht ungeschützt läuft – in Verbindung mit `restart: unless-stopped` sieht das nach einem Absturz aus. Die Ursache steht in `docker compose logs`.
+- **Ein Gerät bekommt „Token abgelehnt"**: In den Logs erscheint eine `auth:`-Zeile mit dem Grund (falscher Token oder gar kein `Authorization`-Header). Token in der App unter *Einstellungen → Server-Synchronisation* mit dem Wert aus der `.env` abgleichen – ohne das `SYNC_TOKEN=`-Präfix.
+
+## Sicherheit im Betrieb
+
+Der Server läuft im Container als unprivilegierter Nutzer (`syncsrv`, UID 10001), nicht als root. Beim Start passt ein Entrypoint-Skript einmalig die Besitzrechte des gemounteten `./data`-Verzeichnisses an und gibt die Rootrechte danach dauerhaft ab – ein Update einer bestehenden Installation braucht dafür keinen manuellen Eingriff. Zusätzlich sind in `docker-compose.yml` alle Linux-Capabilities bis auf die für diesen Wechsel nötigen abgelegt und `no-new-privileges` gesetzt.
+
+Das ersetzt keine Netzwerkabsicherung: Der Server hat weiterhin keine TLS-Verschlüsselung und keinen Schutz gegen wiederholte Anmeldeversuche. Er gehört ausschließlich in ein vertrauenswürdiges Heim-Netzwerk, ohne Port-Forwarding.
+
 ## Stack
 
 Dart, [`shelf`](https://pub.dev/packages/shelf) + [`shelf_router`](https://pub.dev/packages/shelf_router), [`sqlite3`](https://pub.dev/packages/sqlite3) (kein Drift server-seitig, da keine reaktiven Streams benötigt werden).

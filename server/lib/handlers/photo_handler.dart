@@ -104,8 +104,17 @@ class PhotoHandler {
     // gegenseitig überschreiben, ohne dass einer der beiden einen 409 sieht.
     // Die WHERE-Klausel selbst ist der Lock: das UPDATE betrifft nur dann
     // eine Zeile, wenn photo_version zum Ausführungszeitpunkt noch exakt dem
-    // erwarteten Vorgänger-Stand entspricht (inkl. NULL-Fall beim Erst-Upload
-    // ohne bekannten Vorgänger).
+    // erwarteten Vorgänger-Stand entspricht.
+    //
+    // Ein FEHLENDER x-expected-photo-version-Header erlaubt ausschließlich den
+    // Erst-Upload (photo_version IS NULL), nicht mehr das bedingungslose
+    // Überschreiben eines bereits vorhandenen Fotos. Zuvor genügte ein
+    // fehlender Header, um jeden Serverstand zu ersetzen – ein Client, der
+    // den zuletzt bekannten Server-Stand aus irgendeinem Grund nicht mehr
+    // kennt (z. B. weil die Pflanze aus seinem Delta-Fenster gefallen ist),
+    // konnte damit ein neueres fremdes Foto durch sein eigenes älteres
+    // ersetzen. Wer bewusst überschreiben will, schickt den aktuellen
+    // Serverstand als erwarteten Vorgänger mit.
     //
     // Datei wird ERST NACH dem erfolgreichen DB-Update geschrieben: schlägt
     // das Update fehl (Versionskonflikt), bleibt der bisherige Dateiinhalt
@@ -118,8 +127,7 @@ class PhotoHandler {
       '''
       UPDATE plants SET photo_version = ?, received_at = ?
       WHERE id = ? AND (
-        (? IS NULL) OR
-        (photo_version IS NULL AND ? IS NULL) OR
+        (? IS NULL AND photo_version IS NULL) OR
         (photo_version = ?)
       )
       ''',
@@ -127,7 +135,6 @@ class PhotoHandler {
         version,
         receivedAt,
         plantId,
-        expectedPriorVersion,
         expectedPriorVersion,
         expectedPriorVersion,
       ],
