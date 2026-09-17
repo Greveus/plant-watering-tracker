@@ -18,6 +18,11 @@ SyncResponseDto _$SyncResponseDtoFromJson(Map<String, dynamic> json) =>
       wateringEvents: (json['wateringEvents'] as List<dynamic>)
           .map((e) => WateringEventDto.fromJson(e as Map<String, dynamic>))
           .toList(),
+      absences:
+          (json['absences'] as List<dynamic>?)
+              ?.map((e) => AbsenceDto.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
 
 Map<String, dynamic> _$SyncResponseDtoToJson(SyncResponseDto instance) =>
@@ -26,4 +31,5 @@ Map<String, dynamic> _$SyncResponseDtoToJson(SyncResponseDto instance) =>
       'rooms': instance.rooms,
       'plants': instance.plants,
       'wateringEvents': instance.wateringEvents,
+      'absences': instance.absences,
     };

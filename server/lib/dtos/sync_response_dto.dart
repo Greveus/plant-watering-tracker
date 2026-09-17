@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
+import 'absence_dto.dart';
 import 'plant_dto.dart';
 import 'room_dto.dart';
 import 'watering_event_dto.dart';
@@ -13,11 +14,17 @@ class SyncResponseDto {
   final List<PlantDto> plants;
   final List<WateringEventDto> wateringEvents;
 
+  /// Ältere Clients ignorieren das Feld schlicht – json_serializable
+  /// überspringt unbekannte Schlüssel beim Deserialisieren.
+  @JsonKey(defaultValue: <AbsenceDto>[])
+  final List<AbsenceDto> absences;
+
   SyncResponseDto({
     required this.serverTime,
     required this.rooms,
     required this.plants,
     required this.wateringEvents,
+    this.absences = const [],
   });
 
   factory SyncResponseDto.fromJson(Map<String, dynamic> json) =>

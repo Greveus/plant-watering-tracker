@@ -8,6 +8,15 @@ class ServerDatabase {
   factory ServerDatabase.open(String path) {
     final db = sqlite3.open(path);
     db.execute('PRAGMA journal_mode = WAL;');
+    // Fremdschlüssel bewusst AUS: Beim Sync ist die Ankunftsreihenfolge nicht
+    // garantiert – eine Pflanze kann vor ihrem Raum eintreffen, ein Gieß-Event
+    // vor seiner Pflanze. Mit aktiven Constraints würde der Merge an der
+    // Reihenfolge scheitern statt am Inhalt, und zwar dauerhaft: der Client
+    // schickt denselben Datensatz beim nächsten Sync erneut und er würde
+    // erneut abgelehnt. Preis dafür: Verwaiste Datensätze sind möglich (z. B.
+    // ein Event, dessen Pflanze nie ankommt). Sie stören nicht, weil Clients
+    // nur Datensätze auswerten, deren Bezug sie kennen – bereinigt werden sie
+    // aber auch von niemandem.
     db.execute('PRAGMA foreign_keys = OFF;');
     _createSchema(db);
     _migrateSchema(db);
@@ -61,10 +70,24 @@ class ServerDatabase {
         received_at INTEGER NOT NULL
       );
     ''');
+    db.execute('''
+      CREATE TABLE IF NOT EXISTS absences (
+        id TEXT PRIMARY KEY,
+        start_date INTEGER NOT NULL,
+        end_date INTEGER NOT NULL,
+        note TEXT,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        received_at INTEGER NOT NULL
+      );
+    ''');
     db.execute('CREATE INDEX IF NOT EXISTS idx_plants_received_at ON plants(received_at);');
     db.execute('CREATE INDEX IF NOT EXISTS idx_rooms_received_at ON rooms(received_at);');
     db.execute(
       'CREATE INDEX IF NOT EXISTS idx_events_received_at ON watering_events(received_at);',
+    );
+    db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_absences_received_at ON absences(received_at);',
     );
   }
 
